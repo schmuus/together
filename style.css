@@ -133,6 +133,7 @@ input,textarea,select{ font-family: var(--font-body); }
 
 /* ===== App shell ===== */
 .view-app{ min-height:100vh; display:flex; flex-direction:column; }
+.view[hidden]{ display:none !important; }
 
 .topbar{
   display:flex;

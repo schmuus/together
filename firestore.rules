@@ -1,0 +1,19 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAllowed() {
+      return request.auth != null &&
+        request.auth.token.email in [
+          "partner1@example.com",
+          "partner2@example.com"
+        ];
+    }
+
+    match /entries/{entryId} {
+      allow read, create, update: if isAllowed();
+      allow delete: if false; // Einträge werden bewusst nicht gelöscht, nur der Status geändert
+    }
+  }
+}

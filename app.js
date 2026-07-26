@@ -5,7 +5,7 @@ import {
   getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
 import {
-  getFirestore, collection, addDoc, doc, updateDoc, onSnapshot,
+  getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot,
   serverTimestamp, query, orderBy
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
 
@@ -162,9 +162,9 @@ entryForm.addEventListener("submit", async (e) => {
   const category = document.getElementById("f-category").value;
   const type = document.getElementById("f-type").value;
   const description = document.getElementById("f-description").value.trim();
+  const cause = document.getElementById("f-cause").value.trim();
+  const prevention = document.getElementById("f-prevention").value.trim();
   const helped = document.getElementById("f-helped").value.trim();
-  const tags = document.getElementById("f-tags").value
-    .split(",").map((t) => t.trim()).filter(Boolean);
   const ratingValue = Number(fRating.value);
 
   const submitBtn = entryForm.querySelector('button[type="submit"]');
@@ -172,7 +172,7 @@ entryForm.addEventListener("submit", async (e) => {
 
   try {
     await addDoc(collection(db, "entries"), {
-      title, category, type, description, tags,
+      title, category, type, description, cause, prevention,
       status: "offen",
       createdBy: currentUser.uid,
       createdByEmail: currentUser.email,
@@ -338,9 +338,10 @@ function renderDetail(entry) {
     <div class="detail-meta">
       <span class="pill">${CATEGORY_LABELS[entry.category] || entry.category}</span>
       <span class="pill">${TYPE_LABELS[entry.type] || entry.type}</span>
-      ${(entry.tags || []).map((t) => `<span class="pill">#${escapeHtml(t)}</span>`).join("")}
     </div>
     <p class="detail-desc">${escapeHtml(entry.description)}</p>
+    ${entry.cause ? `<div class="detail-subblock"><h4>Wie kam es dazu?</h4><p>${escapeHtml(entry.cause)}</p></div>` : ""}
+    ${entry.prevention ? `<div class="detail-subblock"><h4>Wie kann man es vermeiden?</h4><p>${escapeHtml(entry.prevention)}</p></div>` : ""}
 
     <div class="status-row">
       <span style="font-size:0.85rem;color:var(--text-dim);">Status:</span>
@@ -349,6 +350,7 @@ function renderDetail(entry) {
         <option value="klaerung" ${entry.status === "klaerung" ? "selected" : ""}>In Klärung</option>
         <option value="geloest" ${entry.status === "geloest" ? "selected" : ""}>Gelöst</option>
       </select>
+      <button class="btn btn-ghost btn-small btn-delete" id="detail-delete" style="margin-left:auto;">Eintrag löschen</button>
     </div>
 
     <div id="detail-gauge"></div>
@@ -357,13 +359,13 @@ function renderDetail(entry) {
       <div class="rater-col mine">
         <h4>Ich</h4>
         ${myRating
-          ? `<div class="rater-score">${myRating.value}/10</div>${myRating.helped ? `<div class="rater-note">Hätte geholfen: ${escapeHtml(myRating.helped)}</div>` : ""}`
+          ? `<div class="rater-score">${myRating.value}/10</div>${myRating.helped ? `<div class="rater-note">${escapeHtml(myRating.helped)}</div>` : ""}`
           : `<div class="rater-empty">Noch nicht bewertet</div>`}
       </div>
       <div class="rater-col">
         <h4>${escapeHtml(DISPLAY_NAMES[pEmail] || "Partner")}</h4>
         ${partnerRating
-          ? `<div class="rater-score">${partnerRating.value}/10</div>${partnerRating.helped ? `<div class="rater-note">Hätte geholfen: ${escapeHtml(partnerRating.helped)}</div>` : ""}`
+          ? `<div class="rater-score">${partnerRating.value}/10</div>${partnerRating.helped ? `<div class="rater-note">${escapeHtml(partnerRating.helped)}</div>` : ""}`
           : `<div class="rater-empty">Noch nicht bewertet</div>`}
       </div>
     </div>
@@ -379,7 +381,7 @@ function renderDetail(entry) {
         </div>
       </div>
       <div class="field">
-        <span>Was hätte mir geholfen? <em>(optional)</em></span>
+        <span>Bemerkung <em>(optional)</em></span>
         <textarea id="detail-helped" rows="2">${myRating?.helped ? escapeHtml(myRating.helped) : ""}</textarea>
       </div>
       <button class="btn btn-primary" id="detail-save-rating">Bewertung speichern</button>
@@ -394,6 +396,20 @@ function renderDetail(entry) {
 
   document.getElementById("detail-status").addEventListener("change", async (e) => {
     await updateDoc(doc(db, "entries", entry.id), { status: e.target.value });
+  });
+
+  document.getElementById("detail-delete").addEventListener("click", async () => {
+    const sure = window.confirm(`"${entry.title}" wirklich unwiderruflich löschen?`);
+    if (!sure) return;
+    const btn = document.getElementById("detail-delete");
+    btn.disabled = true;
+    try {
+      await deleteDoc(doc(db, "entries", entry.id));
+      closeModal();
+    } catch (err) {
+      alert("Löschen fehlgeschlagen: " + err.message);
+      btn.disabled = false;
+    }
   });
 
   document.getElementById("detail-save-rating").addEventListener("click", async () => {

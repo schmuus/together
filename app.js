@@ -142,6 +142,24 @@ function partnerEmail() {
   return ALLOWED_EMAILS.find((e) => e !== currentUser.email);
 }
 
+// ---------- E-Mail-Benachrichtigungen ----------
+// Schreibt ein Dokument in die "mail"-Collection. Die Firebase Extension
+// "Trigger Email from Firestore" (falls installiert) verschickt daraus
+// automatisch eine echte E-Mail. Ohne installierte Extension passiert hier
+// einfach nichts Schädliches - das Dokument liegt nur ungenutzt in Firestore.
+async function sendNotificationEmail(subject, text) {
+  try {
+    await addDoc(collection(db, "mail"), {
+      to: [partnerEmail()],
+      message: { subject, text },
+      createdAt: serverTimestamp()
+    });
+  } catch (err) {
+    // Benachrichtigung ist "nice to have" - ein Fehler hier soll die App nicht blockieren.
+    console.warn("Benachrichtigung konnte nicht gesendet werden:", err.message);
+  }
+}
+
 // ---------- Tabs ----------
 tabsNav.addEventListener("click", (e) => {
   const btn = e.target.closest(".tab-btn");
@@ -172,7 +190,7 @@ entryForm.addEventListener("submit", async (e) => {
 
   try {
     await addDoc(collection(db, "entries"), {
-      title, category, type, description, cause, prevention,
+      title, category, type, description,
       status: "offen",
       createdBy: currentUser.uid,
       createdByEmail: currentUser.email,
@@ -181,6 +199,8 @@ entryForm.addEventListener("submit", async (e) => {
         [currentUser.uid]: {
           value: ratingValue,
           helped: helped,
+          cause: cause,
+          prevention: prevention,
           email: currentUser.email,
           ratedAt: new Date().toISOString()
         }
@@ -327,6 +347,15 @@ modalClose.addEventListener("click", closeModal);
 modalOverlay.addEventListener("click", (e) => { if (e.target === modalOverlay) closeModal(); });
 function closeModal() { modalOverlay.hidden = true; modalContent.innerHTML = ""; }
 
+function renderRaterDetails(rating) {
+  return `
+    <div class="rater-score">${rating.value}/10</div>
+    ${rating.cause ? `<div class="rater-note"><strong>Wie kam es dazu?</strong><br>${escapeHtml(rating.cause)}</div>` : ""}
+    ${rating.prevention ? `<div class="rater-note"><strong>Vermeidung:</strong><br>${escapeHtml(rating.prevention)}</div>` : ""}
+    ${rating.helped ? `<div class="rater-note"><strong>Bemerkung:</strong><br>${escapeHtml(rating.helped)}</div>` : ""}
+  `;
+}
+
 function renderDetail(entry) {
   const myRating = entry.ratings?.[currentUser.uid];
   const pEmail = partnerEmail();
@@ -340,8 +369,8 @@ function renderDetail(entry) {
       <span class="pill">${TYPE_LABELS[entry.type] || entry.type}</span>
     </div>
     <p class="detail-desc">${escapeHtml(entry.description)}</p>
-    ${entry.cause ? `<div class="detail-subblock"><h4>Wie kam es dazu?</h4><p>${escapeHtml(entry.cause)}</p></div>` : ""}
-    ${entry.prevention ? `<div class="detail-subblock"><h4>Wie kann man es vermeiden?</h4><p>${escapeHtml(entry.prevention)}</p></div>` : ""}
+    ${entry.cause && !myRating?.cause && !partnerRating?.cause ? `<div class="detail-subblock"><h4>Wie kam es dazu?</h4><p>${escapeHtml(entry.cause)}</p></div>` : ""}
+    ${entry.prevention && !myRating?.prevention && !partnerRating?.prevention ? `<div class="detail-subblock"><h4>Wie kann man es vermeiden?</h4><p>${escapeHtml(entry.prevention)}</p></div>` : ""}
 
     <div class="status-row">
       <span style="font-size:0.85rem;color:var(--text-dim);">Status:</span>
@@ -358,20 +387,27 @@ function renderDetail(entry) {
     <div class="rater-columns">
       <div class="rater-col mine">
         <h4>Ich</h4>
-        ${myRating
-          ? `<div class="rater-score">${myRating.value}/10</div>${myRating.helped ? `<div class="rater-note">${escapeHtml(myRating.helped)}</div>` : ""}`
-          : `<div class="rater-empty">Noch nicht bewertet</div>`}
+        ${myRating ? renderRaterDetails(myRating) : `<div class="rater-empty">Noch nicht bewertet</div>`}
       </div>
       <div class="rater-col">
         <h4>${escapeHtml(DISPLAY_NAMES[pEmail] || "Partner")}</h4>
-        ${partnerRating
-          ? `<div class="rater-score">${partnerRating.value}/10</div>${partnerRating.helped ? `<div class="rater-note">${escapeHtml(partnerRating.helped)}</div>` : ""}`
-          : `<div class="rater-empty">Noch nicht bewertet</div>`}
+        ${partnerRating ? renderRaterDetails(partnerRating) : `<div class="rater-empty">Noch nicht bewertet</div>`}
       </div>
     </div>
 
     <div class="own-rating-form">
-      <h3>${myRating ? "Meine Bewertung anpassen" : "Ich bewerte das auch"}</h3>
+      <h3>${myRating ? "Meine Bewertung anpassen" : "Ich reagiere auch darauf"}</h3>
+
+      <label class="field">
+        <span>Wie kam es dazu? / Woran hat es gelegen? <em>(optional)</em></span>
+        <textarea id="detail-cause" rows="2">${myRating?.cause ? escapeHtml(myRating.cause) : ""}</textarea>
+      </label>
+
+      <label class="field">
+        <span>Wie kann man es in Zukunft vermeiden? <em>(optional)</em></span>
+        <textarea id="detail-prevention" rows="2">${myRating?.prevention ? escapeHtml(myRating.prevention) : ""}</textarea>
+      </label>
+
       <div class="field">
         <span>Wie empfinde ich das? <strong id="detail-rating-value">${myRating?.value ?? 5}</strong>/10</span>
         <div class="rating-slider-wrap">
@@ -380,10 +416,12 @@ function renderDetail(entry) {
           <span class="rating-endlabel">gut</span>
         </div>
       </div>
-      <div class="field">
+
+      <label class="field">
         <span>Bemerkung <em>(optional)</em></span>
         <textarea id="detail-helped" rows="2">${myRating?.helped ? escapeHtml(myRating.helped) : ""}</textarea>
-      </div>
+      </label>
+
       <button class="btn btn-primary" id="detail-save-rating">Bewertung speichern</button>
     </div>
   `;
@@ -415,12 +453,14 @@ function renderDetail(entry) {
   document.getElementById("detail-save-rating").addEventListener("click", async () => {
     const value = Number(document.getElementById("detail-rating").value);
     const helped = document.getElementById("detail-helped").value.trim();
+    const cause = document.getElementById("detail-cause").value.trim();
+    const prevention = document.getElementById("detail-prevention").value.trim();
     const btn = document.getElementById("detail-save-rating");
     btn.disabled = true;
     try {
       await updateDoc(doc(db, "entries", entry.id), {
         [`ratings.${currentUser.uid}`]: {
-          value, helped, email: currentUser.email, ratedAt: new Date().toISOString()
+          value, helped, cause, prevention, email: currentUser.email, ratedAt: new Date().toISOString()
         }
       });
       closeModal();

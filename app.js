@@ -69,6 +69,31 @@ const modalContent = document.getElementById("modal-content");
 const modalClose = document.getElementById("modal-close");
 
 // ---------- Auth ----------
+const loginToggle = document.getElementById("login-toggle");
+const loginDropdown = document.getElementById("login-dropdown");
+
+loginToggle.addEventListener("click", (e) => {
+  e.stopPropagation();
+  const willOpen = loginDropdown.hidden;
+  loginDropdown.hidden = !willOpen;
+  loginToggle.setAttribute("aria-expanded", String(willOpen));
+  if (willOpen) document.getElementById("login-email").focus();
+});
+
+document.addEventListener("click", (e) => {
+  if (!loginDropdown.hidden && !e.target.closest(".login-dropdown-wrap")) {
+    loginDropdown.hidden = true;
+    loginToggle.setAttribute("aria-expanded", "false");
+  }
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !loginDropdown.hidden) {
+    loginDropdown.hidden = true;
+    loginToggle.setAttribute("aria-expanded", "false");
+  }
+});
+
 loginForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   loginError.hidden = true;
@@ -101,6 +126,8 @@ onAuthStateChanged(auth, (user) => {
     currentUser = null;
     viewApp.hidden = true;
     viewLogin.hidden = false;
+    loginDropdown.hidden = true;
+    loginToggle.setAttribute("aria-expanded", "false");
   }
 });
 

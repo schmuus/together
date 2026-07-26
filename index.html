@@ -13,22 +13,30 @@
 
 <!-- LOGIN -->
 <section id="view-login" class="view view-login">
-  <div class="login-card">
-    <p class="eyebrow">Zwischen uns</p>
-    <h1>Ein Ort für unser Miteinander.</h1>
-    <p class="login-sub">Meldet euch mit eurem Account an, um Situationen festzuhalten und gegenüberzustellen.</p>
-    <form id="login-form">
-      <label>
-        <span>E-Mail</span>
-        <input type="email" id="login-email" required autocomplete="email">
-      </label>
-      <label>
-        <span>Passwort</span>
-        <input type="password" id="login-password" required autocomplete="current-password">
-      </label>
-      <button type="submit" class="btn btn-primary">Anmelden</button>
-      <p class="login-error" id="login-error" hidden></p>
-    </form>
+  <div class="login-landing">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">Zwischen uns</span>
+
+    <div class="login-dropdown-wrap">
+      <button id="login-toggle" class="btn btn-ghost btn-small" aria-expanded="false" aria-controls="login-dropdown">
+        Anmelden
+      </button>
+
+      <div id="login-dropdown" class="login-dropdown" hidden>
+        <form id="login-form">
+          <label>
+            <span>E-Mail</span>
+            <input type="email" id="login-email" required autocomplete="email">
+          </label>
+          <label>
+            <span>Passwort</span>
+            <input type="password" id="login-password" required autocomplete="current-password">
+          </label>
+          <button type="submit" class="btn btn-primary">Anmelden</button>
+          <p class="login-error" id="login-error" hidden></p>
+        </form>
+      </div>
+    </div>
   </div>
 </section>
 

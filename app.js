@@ -142,24 +142,6 @@ function partnerEmail() {
   return ALLOWED_EMAILS.find((e) => e !== currentUser.email);
 }
 
-// ---------- E-Mail-Benachrichtigungen ----------
-// Schreibt ein Dokument in die "mail"-Collection. Die Firebase Extension
-// "Trigger Email from Firestore" (falls installiert) verschickt daraus
-// automatisch eine echte E-Mail. Ohne installierte Extension passiert hier
-// einfach nichts Schädliches - das Dokument liegt nur ungenutzt in Firestore.
-async function sendNotificationEmail(subject, text) {
-  try {
-    await addDoc(collection(db, "mail"), {
-      to: [partnerEmail()],
-      message: { subject, text },
-      createdAt: serverTimestamp()
-    });
-  } catch (err) {
-    // Benachrichtigung ist "nice to have" - ein Fehler hier soll die App nicht blockieren.
-    console.warn("Benachrichtigung konnte nicht gesendet werden:", err.message);
-  }
-}
-
 // ---------- Tabs ----------
 tabsNav.addEventListener("click", (e) => {
   const btn = e.target.closest(".tab-btn");
@@ -173,6 +155,39 @@ tabsNav.addEventListener("click", (e) => {
 
 // ---------- New entry form ----------
 fRating.addEventListener("input", () => { fRatingValue.textContent = fRating.value; });
+
+const DRAFT_KEY = "zwischenuns-entwurf";
+const draftFieldIds = ["f-title", "f-category", "f-type", "f-description", "f-cause", "f-prevention", "f-helped", "f-rating"];
+
+function saveDraft() {
+  const draft = {};
+  draftFieldIds.forEach((id) => { draft[id] = document.getElementById(id).value; });
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); } catch { /* Speicher voll o.ä. - kein Drama */ }
+}
+
+function loadDraft() {
+  let raw;
+  try { raw = localStorage.getItem(DRAFT_KEY); } catch { return; }
+  if (!raw) return;
+  let draft;
+  try { draft = JSON.parse(raw); } catch { return; }
+  draftFieldIds.forEach((id) => {
+    if (draft[id] !== undefined) document.getElementById(id).value = draft[id];
+  });
+  fRatingValue.textContent = fRating.value;
+}
+
+function clearDraft() {
+  try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+}
+
+let draftSaveTimeout;
+entryForm.addEventListener("input", () => {
+  clearTimeout(draftSaveTimeout);
+  draftSaveTimeout = setTimeout(saveDraft, 400);
+});
+
+loadDraft();
 
 entryForm.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -209,6 +224,7 @@ entryForm.addEventListener("submit", async (e) => {
     entryForm.reset();
     fRatingValue.textContent = "5";
     fRating.value = 5;
+    clearDraft();
     document.querySelector('[data-tab="uebersicht"]').click();
   } catch (err) {
     alert("Speichern fehlgeschlagen: " + err.message);
